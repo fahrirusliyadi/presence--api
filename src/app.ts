@@ -1,6 +1,6 @@
 import cors from "cors";
 import express, { Express } from "express";
-import routes from "./routes";
+import { userRoutes } from "./user";
 
 const app: Express = express();
 const port = process.env.PORT || 3000;
@@ -13,7 +13,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Use the routes
-app.use("/", routes);
+app.use("/users", userRoutes);
 
 app.listen(port, () => {
   console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
