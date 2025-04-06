@@ -4,6 +4,8 @@ import multer from "multer";
 import path from "path";
 import { db } from "../db";
 import { usersTable } from "../db/schema";
+import { validate } from "../validation";
+import { createUserSchema } from "./validations";
 
 const router = express.Router();
 // Configure storage with custom filename
@@ -62,6 +64,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 router.post(
   "/",
   upload.single("photo"),
+  validate(createUserSchema),
   async (req: Request, res: Response) => {
     try {
       const userData = req.body;
