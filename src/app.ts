@@ -1,11 +1,19 @@
-import express, { Express, Request, Response } from 'express';
+import cors from "cors";
+import express, { Express } from "express";
+import routes from "./routes";
 
 const app: Express = express();
 const port = process.env.PORT || 3000;
 
-app.get('/', (req: Request, res: Response) => {
-  res.send('Express + TypeScript Server is running');
-});
+// Middleware to enable CORS
+app.use(cors());
+// Middleware to parse JSON bodies
+app.use(express.json());
+// Middleware to parse URL-encoded bodies
+app.use(express.urlencoded({ extended: true }));
+
+// Use the routes
+app.use("/", routes);
 
 app.listen(port, () => {
   console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
