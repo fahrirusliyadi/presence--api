@@ -6,6 +6,7 @@ import { db } from "../db";
 import { usersTable } from "../db/schema";
 import { validate } from "../validation";
 import { createUserSchema } from "./validations";
+import { count } from "drizzle-orm";
 
 const router = express.Router();
 // Configure storage with custom filename
@@ -42,8 +43,22 @@ const upload = multer({
 // GET all users
 router.get("/", async (req: Request, res: Response) => {
   try {
+    // Get pagination parameters from query string
+    const page = parseInt((req.query.page as string) || "1");
+    const limit = parseInt((req.query.limit as string) || "10");
+    // Calculate offset
+    const offset = (page - 1) * limit;
     // This is where you would fetch users from your database
-    res.json({ message: "List of all users", users: [] });
+    const users = await db
+      .select()
+      .from(usersTable)
+      .limit(limit)
+      .offset(offset);
+    // Get total count for pagination metadata
+    const [{ total }] = await db.select({ total: count() }).from(usersTable);
+    const lastPage = Math.ceil(total / limit);
+
+    res.json({ data: users, page, lastPage });
   } catch (error) {
     res.status(500).json({ message: "Error fetching users", error });
   }
@@ -78,7 +93,7 @@ router.post(
       await db.insert(usersTable).values(user);
 
       // This is where you would create a new user
-      res.status(201).json({ message: "User created successfully", user });
+      res.status(201);
     } catch (error) {
       // Delete the uploaded file if an error occurs
       if (req.file) {
