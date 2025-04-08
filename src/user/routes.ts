@@ -7,6 +7,7 @@ import { usersTable } from "../db/schema";
 import { validate } from "../validation";
 import { createUserSchema } from "./validations";
 import { count } from "drizzle-orm";
+import { updateFace } from "./face-recognition";
 
 const router = express.Router();
 // Configure storage with custom filename
@@ -90,10 +91,13 @@ router.post(
         photo: photoFile ? `user/${photoFile.filename}` : null,
       };
 
-      await db.insert(usersTable).values(user);
+      const [{ id }] = await db.insert(usersTable).values(user).$returningId();
 
-      // This is where you would create a new user
-      res.status(201);
+      if (photoFile) {
+        await updateFace(id, photoFile);
+      }
+
+      res.status(201).end();
     } catch (error) {
       // Delete the uploaded file if an error occurs
       if (req.file) {

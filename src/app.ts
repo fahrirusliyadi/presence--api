@@ -1,7 +1,7 @@
 import cors from "cors";
 import express, { Express } from "express";
-import path from "path";
 import { userRoutes } from "./user";
+import { staticRoutes } from "./static";
 
 const app: Express = express();
 const port = process.env.PORT || 3000;
@@ -13,8 +13,11 @@ app.use(express.json());
 // Middleware to parse URL-encoded bodies
 app.use(express.urlencoded({ extended: true }));
 
+app.get("/", (req, res) => {
+  res.send("Presence API");
+});
 // Serve static files from storage/user directory
-app.use("/files", express.static(path.join(process.cwd(), "storage")));
+app.use("/files", staticRoutes);
 
 // Use the routes
 app.use("/users", userRoutes);

@@ -13,14 +13,6 @@ export const validate = (
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const data = req[source];
-      console.log(
-        "Validating data:",
-        data,
-        source,
-        req.body,
-        req.query,
-        req.params,
-      );
       const validatedData = await schema.parseAsync(data);
 
       // Replace the request data with the validated data
@@ -29,7 +21,6 @@ export const validate = (
       return next();
     } catch (error) {
       if (error instanceof ZodError) {
-        console.log(error);
         const formattedErrors = error.errors.map((err) => ({
           path: err.path.join("."),
           message: err.message,
