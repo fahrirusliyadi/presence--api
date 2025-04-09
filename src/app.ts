@@ -1,6 +1,7 @@
 import cors from "cors";
 import express, { Express } from "express";
 import { userRoutes } from "./user";
+import { presenceRoutes } from "./presence";
 import { staticRoutes } from "./static";
 
 const app: Express = express();
@@ -16,11 +17,11 @@ app.use(express.urlencoded({ extended: true }));
 app.get("/", (req, res) => {
   res.send("Presence API");
 });
-// Serve static files from storage/user directory
-app.use("/files", staticRoutes);
 
 // Use the routes
-app.use("/users", userRoutes);
+app.use("/files", staticRoutes);
+app.use("/presence", presenceRoutes);
+app.use("/user", userRoutes);
 
 app.listen(port, () => {
   console.log(`⚡️[server]: Server is running at http://localhost:${port}`);

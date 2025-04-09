@@ -15,13 +15,29 @@ export const updateFace = async (
   // Create a readable stream from the uploaded file
   const fileStream = fs.createReadStream(image.path);
 
+  formData.append("user_id", userId.toString());
   // Append the file to form data
   formData.append("image", fileStream, {
     filename: image.originalname,
     contentType: image.mimetype,
   });
 
-  const response = await api.post(`/recognize/${userId}`, formData);
+  const response = await api.post("/update", formData);
 
   return response.data;
+};
+
+export const recognizeFace = async (image: Express.Multer.File) => {
+  // Create a form data instance
+  const formData = new FormData();
+
+  // Append the file to form data
+  formData.append("image", image.buffer, {
+    filename: image.originalname,
+    contentType: image.mimetype,
+  });
+
+  const response = await api.post("/recognize", formData);
+
+  return Number(response.data.data);
 };
