@@ -1,2 +1,2 @@
-export { default as staticRoutes } from "./routes";
-export { getStaticUrl } from "./utils";
+export { default as staticRoutes } from './routes';
+export { deleteFile } from './utils';

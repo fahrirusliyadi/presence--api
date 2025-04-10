@@ -1,4 +1,12 @@
-export const getStaticUrl = (path: string) => {
-  const baseUrl = process.env.BASE_URL ?? "http://localhost:3000";
-  return new URL(path, baseUrl).toString();
+import fs from 'fs';
+import path from 'path';
+
+export const deleteFile = (file: string) => {
+  const filePath = path.join(process.cwd(), 'storage', file);
+
+  fs.unlink(filePath, (err) => {
+    if (err) {
+      console.error('Error deleting file:', err);
+    }
+  });
 };

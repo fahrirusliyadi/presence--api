@@ -1,19 +1,20 @@
-import express, { Request, Response } from "express";
-import fs from "fs";
-import multer from "multer";
-import path from "path";
-import { db } from "../db";
-import { usersTable } from "../db/schema";
-import { validate } from "../validation";
-import { createUserSchema } from "./validations";
-import { count } from "drizzle-orm";
-import { updateFace } from "./face-recognition";
+import express, { Request, Response } from 'express';
+import multer from 'multer';
+import path from 'path';
+import { db } from '../db';
+import { usersTable } from '../db/schema';
+import { validate } from '../validation';
+import { createUserSchema } from './validations';
+import { count, eq } from 'drizzle-orm';
+import { deleteFace, updateFace } from './face-recognition';
+import { catchAsync, NotFoundError } from '../error';
+import { deleteFile } from '../static';
 
 const router = express.Router();
 // Configure storage with custom filename
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "storage/user");
+    cb(null, 'storage/user');
   },
   filename: (req, file, cb) => {
     // Get file extension
@@ -32,21 +33,21 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // Optional: 5MB file size limit
   fileFilter: (req, file, cb) => {
     // Optional: validate file types
-    const allowedTypes = ["image/jpeg", "image/png"];
+    const allowedTypes = ['image/jpeg', 'image/png'];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Invalid file type. Only JPEG and PNG are allowed."));
+      cb(new Error('Invalid file type. Only JPEG and PNG are allowed.'));
     }
   },
 });
 
 // GET all users
-router.get("/", async (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
     // Get pagination parameters from query string
-    const page = parseInt((req.query.page as string) || "1");
-    const limit = parseInt((req.query.limit as string) || "10");
+    const page = parseInt((req.query.page as string) || '1');
+    const limit = parseInt((req.query.limit as string) || '10');
     // Calculate offset
     const offset = (page - 1) * limit;
     // This is where you would fetch users from your database
@@ -61,25 +62,25 @@ router.get("/", async (req: Request, res: Response) => {
 
     res.json({ data: users, page, lastPage });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching users", error });
+    res.status(500).json({ message: 'Error fetching users', error });
   }
 });
 
 // GET single user by ID
-router.get("/:id", async (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     // This is where you would fetch a specific user by ID
     res.json({ message: `User with ID ${id}`, user: { id } });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching user", error });
+    res.status(500).json({ message: 'Error fetching user', error });
   }
 });
 
 // POST create new user
 router.post(
-  "/",
-  upload.single("photo"),
+  '/',
+  upload.single('photo'),
   validate(createUserSchema),
   async (req: Request, res: Response) => {
     try {
@@ -97,25 +98,20 @@ router.post(
         await updateFace(id, photoFile);
       }
 
-      res.status(201).end();
+      res.status(204).end();
     } catch (error) {
       // Delete the uploaded file if an error occurs
       if (req.file) {
-        const filePath = path.join(__dirname, "..", "..", req.file.path);
-        fs.unlink(filePath, (err) => {
-          if (err) {
-            console.error("Error deleting file:", err);
-          }
-        });
+        deleteFile(req.file.path.replace('storage/', ''));
       }
 
-      res.status(500).json({ message: "Error creating user", error });
+      res.status(500).json({ message: 'Error creating user', error });
     }
   },
 );
 
 // PUT update user
-router.put("/:id", async (req: Request, res: Response) => {
+router.put('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userData = req.body;
@@ -125,19 +121,33 @@ router.put("/:id", async (req: Request, res: Response) => {
       user: { id, ...userData },
     });
   } catch (error) {
-    res.status(500).json({ message: "Error updating user", error });
+    res.status(500).json({ message: 'Error updating user', error });
   }
 });
 
 // DELETE user
-router.delete("/:id", async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    // This is where you would delete a user
-    res.json({ message: `User ${id} deleted successfully` });
-  } catch (error) {
-    res.status(500).json({ message: "Error deleting user", error });
-  }
-});
+router.delete(
+  '/:id',
+  catchAsync(async (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, id));
+
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    await db.delete(usersTable).where(eq(usersTable.id, id));
+    await deleteFace(id);
+
+    if (user.photo) {
+      deleteFile(user.photo);
+    }
+
+    res.status(204).end();
+  }),
+);
 
 export default router;
