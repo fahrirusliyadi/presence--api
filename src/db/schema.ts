@@ -5,8 +5,16 @@ import {
   varchar,
   date,
   bigint,
+  mysqlEnum,
+  index,
 } from 'drizzle-orm/mysql-core';
 import { relations } from 'drizzle-orm';
+
+// Define enum for presence status
+export enum PresenceStatus {
+  PRESENT = 'present',
+  LATE = 'late',
+}
 
 export const userTable = mysqlTable('user', {
   id: serial().primaryKey(),
@@ -17,15 +25,23 @@ export const userTable = mysqlTable('user', {
   updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
 });
 
-export const presenceTable = mysqlTable('presence', {
-  id: serial().primaryKey(),
-  userId: bigint('user_id', { mode: 'number', unsigned: true })
-    .notNull()
-    .references(() => userTable.id),
-  date: date().notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
-});
+export const presenceTable = mysqlTable(
+  'presence',
+  {
+    id: serial().primaryKey(),
+    userId: bigint('user_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => userTable.id),
+    date: date().notNull(),
+    status: mysqlEnum(
+      'status',
+      Object.values(PresenceStatus) as [string, ...string[]],
+    ).notNull(),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+  },
+  (table) => [index('status_idx').on(table.status)],
+);
 
 // Define relationships between tables
 export const userRelations = relations(userTable, ({ many }) => ({

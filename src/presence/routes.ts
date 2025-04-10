@@ -2,9 +2,10 @@ import express, { Request, Response } from 'express';
 import multer from 'multer';
 import { recognizeFace } from '../user/face-recognition';
 import { db } from '../db';
-import { presenceTable, userTable } from '../db/schema';
+import { PresenceStatus, presenceTable, userTable } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { BadRequestError, catchAsync, NotFoundError } from '../error';
+import dayjs from 'dayjs';
 
 const router = express.Router();
 
@@ -73,10 +74,14 @@ router.post(
       });
     }
 
+    const sevenOclock = dayjs().hour(7).minute(0).second(0);
     // Insert new presence record
     const newPresence = {
       userId: userId,
-      date: new Date(new Date().setHours(0, 0, 0, 0)),
+      date: dayjs().startOf('day').toDate(),
+      status: dayjs().isAfter(sevenOclock)
+        ? PresenceStatus.LATE
+        : PresenceStatus.PRESENT,
     };
     const [{ id }] = await db
       .insert(presenceTable)
