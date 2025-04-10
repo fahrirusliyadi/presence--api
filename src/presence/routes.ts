@@ -16,6 +16,22 @@ const upload = multer({
   },
 });
 
+router.get(
+  '/',
+  catchAsync(async (req: Request, res: Response) => {
+    const date = new Date(new Date().setHours(0, 0, 0, 0));
+    const presences = await db.query.presenceTable.findMany({
+      where: eq(presenceTable.date, date),
+      with: {
+        user: true,
+      },
+    });
+    res.json({
+      data: presences,
+    });
+  }),
+);
+
 router.post(
   '/',
   upload.single('image'),

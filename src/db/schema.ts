@@ -6,6 +6,7 @@ import {
   date,
   bigint,
 } from 'drizzle-orm/mysql-core';
+import { relations } from 'drizzle-orm';
 
 export const userTable = mysqlTable('user', {
   id: serial().primaryKey(),
@@ -25,3 +26,15 @@ export const presenceTable = mysqlTable('presence', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
 });
+
+// Define relationships between tables
+export const userRelations = relations(userTable, ({ many }) => ({
+  presences: many(presenceTable),
+}));
+
+export const presenceRelations = relations(presenceTable, ({ one }) => ({
+  user: one(userTable, {
+    fields: [presenceTable.userId],
+    references: [userTable.id],
+  }),
+}));

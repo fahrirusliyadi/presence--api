@@ -43,8 +43,9 @@ const upload = multer({
 });
 
 // GET all users
-router.get('/', async (req: Request, res: Response) => {
-  try {
+router.get(
+  '/',
+  catchAsync(async (req: Request, res: Response) => {
     // Get pagination parameters from query string
     const page = parseInt((req.query.page as string) || '1');
     const limit = parseInt((req.query.limit as string) || '10');
@@ -57,21 +58,8 @@ router.get('/', async (req: Request, res: Response) => {
     const lastPage = Math.ceil(total / limit);
 
     res.json({ data: users, page, lastPage });
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching users', error });
-  }
-});
-
-// GET single user by ID
-router.get('/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    // This is where you would fetch a specific user by ID
-    res.json({ message: `User with ID ${id}`, user: { id } });
-  } catch (error) {
-    res.status(500).json({ message: 'Error fetching user', error });
-  }
-});
+  }),
+);
 
 // POST create new user
 router.post(
@@ -105,21 +93,6 @@ router.post(
     }
   },
 );
-
-// PUT update user
-router.put('/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const userData = req.body;
-    // This is where you would update a user
-    res.json({
-      message: `User ${id} updated successfully`,
-      user: { id, ...userData },
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Error updating user', error });
-  }
-});
 
 // DELETE user
 router.delete(
