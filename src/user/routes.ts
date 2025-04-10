@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import { db } from '../db';
-import { usersTable } from '../db/schema';
+import { userTable } from '../db/schema';
 import { validate } from '../validation';
 import { createUserSchema } from './validations';
 import { count, eq } from 'drizzle-orm';
@@ -51,13 +51,9 @@ router.get('/', async (req: Request, res: Response) => {
     // Calculate offset
     const offset = (page - 1) * limit;
     // This is where you would fetch users from your database
-    const users = await db
-      .select()
-      .from(usersTable)
-      .limit(limit)
-      .offset(offset);
+    const users = await db.select().from(userTable).limit(limit).offset(offset);
     // Get total count for pagination metadata
-    const [{ total }] = await db.select({ total: count() }).from(usersTable);
+    const [{ total }] = await db.select({ total: count() }).from(userTable);
     const lastPage = Math.ceil(total / limit);
 
     res.json({ data: users, page, lastPage });
@@ -86,13 +82,13 @@ router.post(
     try {
       const userData = req.body;
       const photoFile = req.file;
-      const user: typeof usersTable.$inferInsert = {
+      const user: typeof userTable.$inferInsert = {
         name: userData.name,
         email: userData.email,
         photo: photoFile ? `user/${photoFile.filename}` : null,
       };
 
-      const [{ id }] = await db.insert(usersTable).values(user).$returningId();
+      const [{ id }] = await db.insert(userTable).values(user).$returningId();
 
       if (photoFile) {
         await updateFace(id, photoFile);
@@ -132,15 +128,15 @@ router.delete(
     const id = Number(req.params.id);
     const [user] = await db
       .select()
-      .from(usersTable)
-      .where(eq(usersTable.id, id));
+      .from(userTable)
+      .where(eq(userTable.id, id));
 
     if (!user) {
       throw new NotFoundError('User not found');
     }
 
-    await db.delete(usersTable).where(eq(usersTable.id, id));
-    await deleteFace(id);
+    await db.delete(userTable).where(eq(userTable.id, id));
+    deleteFace(id);
 
     if (user.photo) {
       deleteFile(user.photo);

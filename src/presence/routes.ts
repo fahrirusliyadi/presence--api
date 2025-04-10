@@ -1,10 +1,10 @@
-import express, { Request, Response } from "express";
-import multer from "multer";
-import { recognizeFace } from "../user/face-recognition";
-import { db } from "../db";
-import { usersTable } from "../db/schema";
-import { eq } from "drizzle-orm";
-import { catchAsync } from "../error";
+import express, { Request, Response } from 'express';
+import multer from 'multer';
+import { recognizeFace } from '../user/face-recognition';
+import { db } from '../db';
+import { presenceTable, userTable } from '../db/schema';
+import { eq, and } from 'drizzle-orm';
+import { BadRequestError, catchAsync, NotFoundError } from '../error';
 
 const router = express.Router();
 
@@ -17,30 +17,66 @@ const upload = multer({
 });
 
 router.post(
-  "/",
-  upload.single("image"),
+  '/',
+  upload.single('image'),
   catchAsync(async (req: Request, res: Response) => {
     // Check if file exists in the request
     if (!req.file) {
-      return res.status(400).json({ error: "No image file provided" });
+      throw new BadRequestError('No image file provided');
     }
 
     const userId = await recognizeFace(req.file);
-    const users = await db
+    const [user] = await db
       .select()
-      .from(usersTable)
-      .where(eq(usersTable.id, userId))
+      .from(userTable)
+      .where(eq(userTable.id, userId))
       .limit(1);
 
-    if (users.length === 0) {
-      return res.status(404).json({ error: "User not found" });
+    if (!user) {
+      throw new NotFoundError('User not found');
     }
 
-    const user = users[0];
+    // Check if the user has already checked in
+    const [existingPresence] = await db
+      .select()
+      .from(presenceTable)
+      .where(
+        and(
+          eq(presenceTable.userId, userId),
+          eq(presenceTable.date, new Date(new Date().setHours(0, 0, 0, 0))),
+        ),
+      )
+      .limit(1);
 
-    // Return success response with file metadata
+    if (existingPresence) {
+      return res.json({
+        data: {
+          ...existingPresence,
+          user,
+        },
+      });
+    }
+
+    // Insert new presence record
+    const newPresence = {
+      userId: userId,
+      date: new Date(new Date().setHours(0, 0, 0, 0)),
+    };
+    const [{ id }] = await db
+      .insert(presenceTable)
+      .values(newPresence)
+      .$returningId();
+    const [presence] = await db
+      .select()
+      .from(presenceTable)
+      .where(eq(presenceTable.id, id))
+      .limit(1);
+
     res.status(200).json({
-      data: user,
+      data: {
+        ...presence,
+        user,
+      },
     });
   }),
 );
