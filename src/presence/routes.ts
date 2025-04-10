@@ -20,9 +20,11 @@ const upload = multer({
 router.get(
   '/',
   catchAsync(async (req: Request, res: Response) => {
-    const date = new Date(new Date().setHours(0, 0, 0, 0));
     const presences = await db.query.presenceTable.findMany({
-      where: eq(presenceTable.date, date),
+      where: eq(
+        presenceTable.date,
+        dayjs().startOf('day').format('YYYY-MM-DD'),
+      ),
       with: {
         user: true,
       },
@@ -60,7 +62,7 @@ router.post(
       .where(
         and(
           eq(presenceTable.userId, userId),
-          eq(presenceTable.date, new Date(new Date().setHours(0, 0, 0, 0))),
+          eq(presenceTable.date, dayjs().startOf('day').format('YYYY-MM-DD')),
         ),
       )
       .limit(1);
@@ -78,7 +80,7 @@ router.post(
     // Insert new presence record
     const newPresence = {
       userId: userId,
-      date: dayjs().startOf('day').toDate(),
+      date: dayjs().startOf('day').format('YYYY-MM-DD'),
       status: dayjs().isAfter(sevenOclock)
         ? PresenceStatus.LATE
         : PresenceStatus.PRESENT,

@@ -21,8 +21,10 @@ export const userTable = mysqlTable('user', {
   name: varchar({ length: 255 }).notNull(),
   email: varchar({ length: 255 }).notNull().unique(),
   photo: varchar({ length: 255 }),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+  createdAt: timestamp('created_at', { mode: 'string' }).defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'string' })
+    .defaultNow()
+    .onUpdateNow(),
 });
 
 export const presenceTable = mysqlTable(
@@ -32,13 +34,15 @@ export const presenceTable = mysqlTable(
     userId: bigint('user_id', { mode: 'number', unsigned: true })
       .notNull()
       .references(() => userTable.id),
-    date: date().notNull(),
+    date: date({ mode: 'string' }).notNull(),
     status: mysqlEnum(
       'status',
       Object.values(PresenceStatus) as [string, ...string[]],
     ).notNull(),
-    createdAt: timestamp('created_at').defaultNow(),
-    updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+    createdAt: timestamp('created_at', { mode: 'string' }).defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'string' })
+      .defaultNow()
+      .onUpdateNow(),
   },
   (table) => [index('status_idx').on(table.status)],
 );
