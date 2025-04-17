@@ -66,7 +66,7 @@ router.post(
   '/',
   upload.single('photo'),
   validate(createUserSchema),
-  async (req: Request, res: Response) => {
+  catchAsync(async (req: Request, res: Response) => {
     try {
       const userData = req.body;
       const photoFile = req.file;
@@ -89,9 +89,9 @@ router.post(
         deleteFile(req.file.path.replace('storage/', ''));
       }
 
-      res.status(500).json({ message: 'Error creating user', error });
+      throw error;
     }
-  },
+  }),
 );
 
 // DELETE user
@@ -109,7 +109,7 @@ router.delete(
     }
 
     await db.delete(userTable).where(eq(userTable.id, id));
-    deleteFace(id);
+    deleteFace(id).catch(console.warn);
 
     if (user.photo) {
       deleteFile(user.photo);
