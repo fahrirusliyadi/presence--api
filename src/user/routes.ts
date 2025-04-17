@@ -76,11 +76,16 @@ router.post(
         photo: photoFile ? `user/${photoFile.filename}` : null,
       };
 
-      const [{ id }] = await db.insert(userTable).values(user).$returningId();
+      // Use a transaction to ensure database consistency
+      await db.transaction(async (tx) => {
+        // Insert the user within the transaction
+        const [{ id }] = await tx.insert(userTable).values(user).$returningId();
 
-      if (photoFile) {
-        await updateFace(id, photoFile);
-      }
+        // Register the face within the same transaction
+        if (photoFile) {
+          await updateFace(id, photoFile);
+        }
+      });
 
       res.status(204).end();
     } catch (error) {
