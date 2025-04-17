@@ -1,34 +1,48 @@
 export class AppError extends Error {
   status: number;
+  type: string;
 
   constructor(message: string, status: number) {
     super(message);
     this.status = status;
     this.name = this.constructor.name;
+    this.type = this.constructor.name;
     Error.captureStackTrace(this, this.constructor);
   }
 }
 
 export class NotFoundError extends AppError {
-  constructor(message = "Resource not found") {
+  constructor(message = 'Resource not found') {
     super(message, 404);
   }
 }
 
 export class BadRequestError extends AppError {
-  constructor(message = "Bad request") {
+  constructor(message = 'Bad request') {
     super(message, 400);
   }
 }
 
 export class UnauthorizedError extends AppError {
-  constructor(message = "Unauthorized access") {
+  constructor(message = 'Unauthorized access') {
     super(message, 401);
   }
 }
 
 export class ForbiddenError extends AppError {
-  constructor(message = "Forbidden access") {
+  constructor(message = 'Forbidden access') {
     super(message, 403);
+  }
+}
+
+export class ValidationError extends AppError {
+  constructor(message = 'Validation failed') {
+    super(message, 422);
+  }
+}
+
+export class ServiceUnavailableError extends AppError {
+  constructor(message = 'Service unavailable') {
+    super(message, 503);
   }
 }

@@ -19,15 +19,31 @@ export const errorHandler: ErrorRequestHandler = (
   // Set content type to application/json
   res.setHeader('Content-Type', 'application/json');
 
-  // Default error status and message
-  const statusCode = err instanceof AppError ? err.status : 500;
-  const message =
-    isAxiosError(err) && err.response
-      ? (err.response.data.message ?? err.message)
-      : err.message;
+  let statusCode: number;
+  let message: string;
+  let errorType: string;
+
+  // Handle different error types with combined logic
+  if (isAxiosError(err)) {
+    // Axios errors - extract status, message and type from response
+    statusCode = err.response?.status ?? 500;
+    message = err.response?.data?.message ?? err.message;
+    errorType = err.response?.data?.type ?? 'AxiosError';
+  } else if (err instanceof AppError) {
+    // Custom application errors
+    statusCode = err.status;
+    message = err.message;
+    errorType = err.type;
+  } else {
+    // Other errors
+    statusCode = 500;
+    message = err.message;
+    errorType = err.constructor.name ?? 'Error';
+  }
 
   res.status(statusCode).json({
     message,
+    type: errorType,
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
 };
