@@ -6,6 +6,7 @@ import { PresenceStatus, presenceTable, userTable } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { BadRequestError, catchAsync, NotFoundError } from '../error';
 import dayjs from 'dayjs';
+import config from '../config';
 
 const router = express.Router();
 
@@ -17,91 +18,240 @@ const upload = multer({
   },
 });
 
+/**
+ * Fetches presence records for the current day
+ */
 router.get(
   '/',
   catchAsync(async (req: Request, res: Response) => {
+    const currentDate = dayjs().startOf('day').format('YYYY-MM-DD');
+
     const presences = await db.query.presenceTable.findMany({
-      where: eq(
-        presenceTable.date,
-        dayjs().startOf('day').format('YYYY-MM-DD'),
-      ),
+      where: eq(presenceTable.date, currentDate),
       with: {
         user: true,
       },
     });
+
     res.json({
       data: presences,
     });
   }),
 );
 
+/**
+ * Records presence (check-in or check-out)
+ */
 router.post(
   '/',
   upload.single('image'),
   catchAsync(async (req: Request, res: Response) => {
-    // Check if file exists in the request
-    if (!req.file) {
-      throw new BadRequestError('No image file provided');
-    }
+    // Validate request and identify user
+    const user = await validateRequestAndGetUser(req);
 
-    const userId = await recognizeFace(req.file);
-    const [user] = await db
-      .select()
-      .from(userTable)
-      .where(eq(userTable.id, userId))
-      .limit(1);
+    const now = dayjs();
+    const currentTime = now.format('HH:mm');
+    const currentDate = now.startOf('day').format('YYYY-MM-DD');
 
-    if (!user) {
-      throw new NotFoundError('User not found');
-    }
+    // Get existing presence record for user today (if any)
+    const existingPresence = await getUserPresenceForToday(
+      user.id,
+      currentDate,
+    );
 
-    // Check if the user has already checked in
-    const [existingPresence] = await db
-      .select()
-      .from(presenceTable)
-      .where(
-        and(
-          eq(presenceTable.userId, userId),
-          eq(presenceTable.date, dayjs().startOf('day').format('YYYY-MM-DD')),
-        ),
-      )
-      .limit(1);
+    // Determine if this is a check-in or check-out
+    const isCheckoutTime = isAfterCheckoutTime(now);
 
-    if (existingPresence) {
-      return res.json({
-        data: {
-          ...existingPresence,
-          user,
-        },
+    if (!isCheckoutTime) {
+      // Handle check-in
+      const result = await handleCheckIn(
+        user,
+        existingPresence,
+        currentDate,
+        currentTime,
+        now,
+      );
+      return res.status(result.status ?? 200).json({
+        data: result.data,
+        message: result.message,
+      });
+    } else {
+      // Handle check-out
+      const result = await handleCheckOut(
+        user,
+        existingPresence,
+        currentTime,
+        now,
+      );
+      return res.status(result.status ?? 200).json({
+        data: result.data,
+        message: result.message,
       });
     }
-
-    const sevenOclock = dayjs().hour(7).minute(0).second(0);
-    // Insert new presence record
-    const newPresence = {
-      userId: userId,
-      date: dayjs().startOf('day').format('YYYY-MM-DD'),
-      status: dayjs().isAfter(sevenOclock)
-        ? PresenceStatus.LATE
-        : PresenceStatus.PRESENT,
-    };
-    const [{ id }] = await db
-      .insert(presenceTable)
-      .values(newPresence)
-      .$returningId();
-    const [presence] = await db
-      .select()
-      .from(presenceTable)
-      .where(eq(presenceTable.id, id))
-      .limit(1);
-
-    res.status(200).json({
-      data: {
-        ...presence,
-        user,
-      },
-    });
   }),
 );
+
+/**
+ * Validates request and returns the identified user
+ */
+async function validateRequestAndGetUser(req: Request) {
+  if (!req.file) {
+    throw new BadRequestError('No image file provided');
+  }
+
+  const userId = await recognizeFace(req.file);
+  const [user] = await db
+    .select()
+    .from(userTable)
+    .where(eq(userTable.id, userId))
+    .limit(1);
+
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+
+  return user;
+}
+
+/**
+ * Gets the user's presence record for today (if exists)
+ */
+async function getUserPresenceForToday(userId: number, currentDate: string) {
+  const [existingPresence] = await db
+    .select()
+    .from(presenceTable)
+    .where(
+      and(
+        eq(presenceTable.userId, userId),
+        eq(presenceTable.date, currentDate),
+      ),
+    )
+    .limit(1);
+
+  return existingPresence;
+}
+
+/**
+ * Checks if current time is after checkout threshold time
+ */
+function isAfterCheckoutTime(now: dayjs.Dayjs): boolean {
+  const [checkoutHour, checkoutMinute] = config.presence.checkoutTime
+    .split(':')
+    .map(Number);
+  const checkoutTime = now.hour(checkoutHour).minute(checkoutMinute).second(0);
+  return now.isAfter(checkoutTime);
+}
+
+/**
+ * Determines if user is late based on current time
+ */
+function isUserLate(now: dayjs.Dayjs): boolean {
+  const [checkinHour, checkinMinute] = config.presence.checkinTime
+    .split(':')
+    .map(Number);
+  const checkinTime = now.hour(checkinHour).minute(checkinMinute).second(0);
+  return now.isAfter(checkinTime);
+}
+
+/**
+ * Handles the check-in process
+ */
+async function handleCheckIn(
+  user: typeof userTable.$inferSelect,
+  existingPresence: typeof presenceTable.$inferSelect | null,
+  currentDate: string,
+  currentTime: string,
+  now: dayjs.Dayjs,
+): Promise<PresenceResponse> {
+  // If already checked in today, return existing record
+  if (existingPresence?.checkIn) {
+    return {
+      data: {
+        ...existingPresence,
+        user,
+      },
+      message: 'User has already checked in today',
+    };
+  }
+
+  // Create new presence record
+  const newPresence = {
+    userId: user.id,
+    date: currentDate,
+    status: isUserLate(now) ? PresenceStatus.LATE : PresenceStatus.PRESENT,
+    checkIn: currentTime,
+    checkOut: null,
+  };
+
+  const [{ id }] = await db
+    .insert(presenceTable)
+    .values(newPresence)
+    .$returningId();
+
+  const [presence] = await db
+    .select()
+    .from(presenceTable)
+    .where(eq(presenceTable.id, id))
+    .limit(1);
+
+  return {
+    data: { ...presence, user },
+    message: 'Check-in successful',
+    status: 200,
+  };
+}
+
+/**
+ * Handles the check-out process
+ */
+async function handleCheckOut(
+  user: typeof userTable.$inferSelect,
+  existingPresence: typeof presenceTable.$inferSelect | null,
+  currentTime: string,
+  now: dayjs.Dayjs,
+): Promise<PresenceResponse> {
+  // Must check in before checking out
+  if (!existingPresence) {
+    throw new BadRequestError('User has not checked in today');
+  }
+
+  // If already checked out today, return existing record
+  if (existingPresence.checkOut) {
+    return {
+      data: { ...existingPresence, user },
+      message: 'User has already checked out today',
+    };
+  }
+
+  // Update the presence record with check-out time
+  await db
+    .update(presenceTable)
+    .set({
+      checkOut: currentTime,
+      updatedAt: now.format('YYYY-MM-DD HH:mm:ss'),
+    })
+    .where(eq(presenceTable.id, existingPresence.id));
+
+  const [updatedPresence] = await db
+    .select()
+    .from(presenceTable)
+    .where(eq(presenceTable.id, existingPresence.id))
+    .limit(1);
+
+  return {
+    data: { ...updatedPresence, user },
+    message: 'Check-out successful',
+    status: 200,
+  };
+}
+
+// Helper type for response with properly typed data
+interface PresenceResponse {
+  data: typeof presenceTable.$inferSelect & {
+    user: typeof userTable.$inferSelect;
+  };
+  message: string;
+  status?: number;
+}
 
 export default router;

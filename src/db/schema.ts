@@ -7,6 +7,7 @@ import {
   bigint,
   mysqlEnum,
   index,
+  time,
 } from 'drizzle-orm/mysql-core';
 import { relations } from 'drizzle-orm';
 
@@ -39,6 +40,8 @@ export const presenceTable = mysqlTable(
       'status',
       Object.values(PresenceStatus) as [string, ...string[]],
     ).notNull(),
+    checkIn: time('check_in'),
+    checkOut: time('check_out'),
     createdAt: timestamp('created_at', { mode: 'string' }).defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'string' })
       .defaultNow()
