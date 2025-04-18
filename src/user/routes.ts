@@ -126,6 +126,7 @@ const processUser = async (
 
     if (userData.name) updateData.name = userData.name;
     if (userData.email) updateData.email = userData.email;
+    if (userData.classId) updateData.classId = userData.classId;
     if (photoFile) {
       updateData.photo = handleUserPhoto(photoFile);
     }
@@ -151,6 +152,7 @@ const processUser = async (
     const insertData = {
       name: (userData as UserCreateInput).name,
       email: (userData as UserCreateInput).email,
+      classId: (userData as UserCreateInput).classId,
       photo: photoFile ? handleUserPhoto(photoFile) : null,
     } as const; // Use as const to ensure type safety
 

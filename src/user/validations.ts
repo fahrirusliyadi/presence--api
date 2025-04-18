@@ -1,12 +1,20 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 // Base schema with common user fields
 export const userBaseSchema = z.object({
-  name: z.string({ required_error: "Nama wajib diisi" }),
+  name: z.string({ required_error: 'Nama wajib diisi' }),
   email: z
-    .string({ required_error: "Email wajib diisi" })
-    .email("Email tidak valid"),
+    .string({ required_error: 'Email wajib diisi' })
+    .email('Email tidak valid'),
   photo: z.string().optional(),
+  classId: z
+    .union([
+      z.string().transform((val) => (val === '' ? null : Number(val))),
+      z.number().int().positive(),
+      z.null(),
+    ])
+    .optional()
+    .nullable(),
 });
 
 // Create schema requires certain fields
