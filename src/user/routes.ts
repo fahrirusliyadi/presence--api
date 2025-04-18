@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import { db, paginate } from '../db';
-import { userTable } from '../db/schema';
+import { userTable, classTable } from '../db/schema';
 import { validate } from '../validation';
 import { createUserSchema, updateUserSchema } from './validations';
 import { count, eq } from 'drizzle-orm';
@@ -80,15 +80,39 @@ const upload = multer({
 router.get(
   '/',
   catchAsync(async (req: Request, res: Response) => {
-    // Build the base query
-    const query = db.select().from(userTable);
+    // Build the base query with class join
+    const query = db
+      .select({
+        user: userTable,
+        class: classTable,
+      })
+      .from(userTable)
+      .leftJoin(classTable, eq(userTable.classId, classTable.id));
 
     // Create a count query for total records
     const countQuery = db.select({ total: count() }).from(userTable);
 
     // Apply pagination
     const result = await paginate(req, query, countQuery);
-    res.json(result);
+
+    // Transform the result to include class as a nested object with proper typing
+    const transformedData = result.data.map((item) => {
+      // Extract user and class from item with proper typing
+      const user = item.user as typeof userTable.$inferSelect;
+      const classData = item.class as typeof classTable.$inferSelect | null;
+
+      return {
+        ...user,
+        class: classData,
+      };
+    });
+
+    // Return the modified result
+    res.json({
+      data: transformedData,
+      page: result.page,
+      lastPage: result.lastPage,
+    });
   }),
 );
 

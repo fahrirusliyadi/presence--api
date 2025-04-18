@@ -2,7 +2,12 @@ import express, { Request, Response } from 'express';
 import multer from 'multer';
 import { recognizeFace } from '../user';
 import { db, paginate } from '../db';
-import { PresenceStatus, presenceTable, userTable } from '../db/schema';
+import {
+  PresenceStatus,
+  presenceTable,
+  userTable,
+  classTable,
+} from '../db/schema';
 import { eq, and, count } from 'drizzle-orm';
 import { BadRequestError, catchAsync, NotFoundError } from '../error';
 import dayjs from 'dayjs';
@@ -107,15 +112,25 @@ async function validateRequestAndGetUser(req: Request) {
   }
 
   const userId = await recognizeFace(req.file);
-  const [user] = await db
-    .select()
+  const [result] = await db
+    .select({
+      user: userTable,
+      class: classTable,
+    })
     .from(userTable)
+    .leftJoin(classTable, eq(userTable.classId, classTable.id))
     .where(eq(userTable.id, userId))
     .limit(1);
 
-  if (!user) {
+  if (!result) {
     throw new NotFoundError('User not found');
   }
+
+  // Add class data to the user object
+  const user = {
+    ...result.user,
+    class: result.class || null,
+  };
 
   return user;
 }
@@ -164,7 +179,9 @@ function isUserLate(now: dayjs.Dayjs): boolean {
  * Handles the check-in process
  */
 async function handleCheckIn(
-  user: typeof userTable.$inferSelect,
+  user: typeof userTable.$inferSelect & {
+    class: typeof classTable.$inferSelect | null;
+  },
   existingPresence: typeof presenceTable.$inferSelect | null,
   currentDate: string,
   currentTime: string,
@@ -212,7 +229,9 @@ async function handleCheckIn(
  * Handles the check-out process
  */
 async function handleCheckOut(
-  user: typeof userTable.$inferSelect,
+  user: typeof userTable.$inferSelect & {
+    class: typeof classTable.$inferSelect | null;
+  },
   existingPresence: typeof presenceTable.$inferSelect | null,
   currentTime: string,
   now: dayjs.Dayjs,
@@ -255,7 +274,9 @@ async function handleCheckOut(
 // Helper type for response with properly typed data
 interface PresenceResponse {
   data: typeof presenceTable.$inferSelect & {
-    user: typeof userTable.$inferSelect;
+    user: typeof userTable.$inferSelect & {
+      class: typeof classTable.$inferSelect | null;
+    };
   };
   message: string;
   status?: number;
