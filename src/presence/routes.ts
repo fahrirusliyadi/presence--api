@@ -47,7 +47,17 @@ router.get(
     // Apply pagination
     const result = await paginate(req, query, countQuery);
 
-    res.json(result);
+    // Transform the result to include user data
+    const transformedData = result.data.map((item) => {
+      const presence = item.presence as typeof presenceTable.$inferSelect;
+      const user = item.user as typeof userTable.$inferSelect;
+      return {
+        ...presence,
+        user,
+      };
+    });
+
+    res.json({ ...result, data: transformedData });
   }),
 );
 
