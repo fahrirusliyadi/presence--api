@@ -36,6 +36,7 @@ router.get(
       .select()
       .from(presenceTable)
       .leftJoin(userTable, eq(presenceTable.userId, userTable.id))
+      .leftJoin(classTable, eq(userTable.classId, classTable.id))
       .where(eq(presenceTable.date, currentDate));
 
     // Create a count query that matches the same filter
@@ -47,13 +48,18 @@ router.get(
     // Apply pagination
     const result = await paginate(req, query, countQuery);
 
-    // Transform the result to include user data
+    // Transform the result to include user and class data
     const transformedData = result.data.map((item) => {
       const presence = item.presence as typeof presenceTable.$inferSelect;
       const user = item.user as typeof userTable.$inferSelect;
+      const classData = item.class as typeof classTable.$inferSelect;
+
       return {
         ...presence,
-        user,
+        user: {
+          ...user,
+          class: classData,
+        },
       };
     });
 
