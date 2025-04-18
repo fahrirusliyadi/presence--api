@@ -4,10 +4,14 @@ import path from 'path';
 import { db, paginate } from '../db';
 import { userTable, classTable } from '../db/schema';
 import { validate } from '../validation';
-import { createUserSchema, updateUserSchema } from './validations';
+import {
+  createUserSchema,
+  updateUserSchema,
+  isEmailUnique,
+} from './validations';
 import { count, eq } from 'drizzle-orm';
 import { deleteFace, updateFace } from './face-recognition';
-import { catchAsync, NotFoundError } from '../error';
+import { catchAsync, NotFoundError, BadRequestError } from '../error';
 import { deleteFile } from '../static';
 import { z } from 'zod';
 
@@ -210,6 +214,13 @@ router.post(
   validate(createUserSchema),
   catchAsync(async (req: Request, res: Response) => {
     try {
+      const userData = req.body as UserCreateInput;
+
+      // Check if email is unique
+      if (userData.email && !(await isEmailUnique(userData.email))) {
+        throw new BadRequestError('Email sudah digunakan');
+      }
+
       await processUser(req.body, req.file);
       res.status(204).end();
     } catch (error) {
@@ -252,6 +263,7 @@ router.put(
   catchAsync(async (req: Request, res: Response) => {
     try {
       const id = Number(req.params.id);
+      const userData = req.body as UserUpdateInput;
 
       // Check if user exists
       const [existingUser] = await db
@@ -261,6 +273,13 @@ router.put(
 
       if (!existingUser) {
         throw new NotFoundError('Siswa tidak ditemukan');
+      }
+
+      // Check if email is unique (if email is being updated)
+      if (userData.email && userData.email !== existingUser.email) {
+        if (!(await isEmailUnique(userData.email, id))) {
+          throw new BadRequestError('Email sudah digunakan');
+        }
       }
 
       await processUser(req.body, req.file, existingUser);
