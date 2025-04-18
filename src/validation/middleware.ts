@@ -1,5 +1,5 @@
-import { Request, Response, NextFunction } from "express";
-import { ZodSchema, ZodError } from "zod";
+import { Request, Response, NextFunction } from 'express';
+import { ZodSchema, ZodError } from 'zod';
 
 /**
  * Middleware for validating request data against a Zod schema
@@ -8,7 +8,7 @@ import { ZodSchema, ZodError } from "zod";
  */
 export const validate = (
   schema: ZodSchema,
-  source: "body" | "query" | "params" = "body",
+  source: 'body' | 'query' | 'params' = 'body',
 ) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -22,20 +22,20 @@ export const validate = (
     } catch (error) {
       if (error instanceof ZodError) {
         const formattedErrors = error.errors.map((err) => ({
-          path: err.path.join("."),
+          path: err.path.join('.'),
           message: err.message,
         }));
 
         return res.status(400).json({
-          status: "error",
+          status: 'error',
           message: formattedErrors[0].message,
           errors: formattedErrors,
         });
       }
 
       return res.status(500).json({
-        status: "error",
-        message: "Internal server error during validation",
+        status: 'error',
+        message: 'Terjadi kesalahan internal selama validasi',
       });
     }
   };

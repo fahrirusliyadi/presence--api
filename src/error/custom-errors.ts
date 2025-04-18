@@ -12,37 +12,37 @@ export class AppError extends Error {
 }
 
 export class NotFoundError extends AppError {
-  constructor(message = 'Resource not found') {
+  constructor(message = 'Sumber daya tidak ditemukan') {
     super(message, 404);
   }
 }
 
 export class BadRequestError extends AppError {
-  constructor(message = 'Bad request') {
+  constructor(message = 'Permintaan tidak valid') {
     super(message, 400);
   }
 }
 
 export class UnauthorizedError extends AppError {
-  constructor(message = 'Unauthorized access') {
+  constructor(message = 'Akses tidak diizinkan') {
     super(message, 401);
   }
 }
 
 export class ForbiddenError extends AppError {
-  constructor(message = 'Forbidden access') {
+  constructor(message = 'Akses dilarang') {
     super(message, 403);
   }
 }
 
 export class ValidationError extends AppError {
-  constructor(message = 'Validation failed') {
+  constructor(message = 'Validasi gagal') {
     super(message, 422);
   }
 }
 
 export class ServiceUnavailableError extends AppError {
-  constructor(message = 'Service unavailable') {
+  constructor(message = 'Layanan tidak tersedia') {
     super(message, 503);
   }
 }

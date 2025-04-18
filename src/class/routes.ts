@@ -52,7 +52,7 @@ router.get(
       .where(eq(classTable.id, id));
 
     if (!classRecord) {
-      throw new NotFoundError('Class not found');
+      throw new NotFoundError('Kelas tidak ditemukan');
     }
 
     // Get students in this class
@@ -102,7 +102,7 @@ router.put(
       .where(eq(classTable.id, id));
 
     if (!existingClass) {
-      throw new NotFoundError('Class not found');
+      throw new NotFoundError('Kelas tidak ditemukan');
     }
 
     // Update class record if there are changes
@@ -131,7 +131,7 @@ router.delete(
       .where(eq(classTable.id, id));
 
     if (!existingClass) {
-      throw new NotFoundError('Class not found');
+      throw new NotFoundError('Kelas tidak ditemukan');
     }
 
     // Check if there are students in this class
@@ -141,7 +141,9 @@ router.delete(
       .where(eq(userTable.classId, id));
 
     if (students[0].count > 0) {
-      throw new BadRequestError('Cannot delete class with associated students');
+      throw new BadRequestError(
+        'Tidak dapat menghapus kelas yang memiliki siswa terkait',
+      );
     }
 
     // Delete class record

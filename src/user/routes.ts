@@ -71,7 +71,11 @@ const upload = multer({
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Only JPEG and PNG are allowed.'));
+      cb(
+        new Error(
+          'Tipe berkas tidak valid. Hanya JPEG dan PNG yang diperbolehkan.',
+        ),
+      );
     }
   },
 });
@@ -127,7 +131,7 @@ router.get(
       .where(eq(userTable.id, id));
 
     if (!user) {
-      throw new NotFoundError('User not found');
+      throw new NotFoundError('Siswa tidak ditemukan');
     }
 
     res.json({ data: user });
@@ -226,7 +230,7 @@ router.delete(
       .where(eq(userTable.id, id));
 
     if (!user) {
-      throw new NotFoundError('User not found');
+      throw new NotFoundError('Siswa tidak ditemukan');
     }
 
     await db.delete(userTable).where(eq(userTable.id, id));
@@ -256,7 +260,7 @@ router.put(
         .where(eq(userTable.id, id));
 
       if (!existingUser) {
-        throw new NotFoundError('User not found');
+        throw new NotFoundError('Siswa tidak ditemukan');
       }
 
       await processUser(req.body, req.file, existingUser);

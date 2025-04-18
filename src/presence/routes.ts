@@ -108,7 +108,7 @@ router.post(
  */
 async function validateRequestAndGetUser(req: Request) {
   if (!req.file) {
-    throw new BadRequestError('No image file provided');
+    throw new BadRequestError('Tidak ada berkas gambar yang diberikan');
   }
 
   const userId = await recognizeFace(req.file);
@@ -123,7 +123,7 @@ async function validateRequestAndGetUser(req: Request) {
     .limit(1);
 
   if (!result) {
-    throw new NotFoundError('User not found');
+    throw new NotFoundError('Siswa tidak ditemukan');
   }
 
   // Add class data to the user object
@@ -194,7 +194,7 @@ async function handleCheckIn(
         ...existingPresence,
         user,
       },
-      message: 'User has already checked in today',
+      message: 'Siswa sudah melakukan presensi masuk hari ini',
     };
   }
 
@@ -220,7 +220,7 @@ async function handleCheckIn(
 
   return {
     data: { ...presence, user },
-    message: 'Check-in successful',
+    message: 'Presensi masuk berhasil',
     status: 200,
   };
 }
@@ -238,14 +238,14 @@ async function handleCheckOut(
 ): Promise<PresenceResponse> {
   // Must check in before checking out
   if (!existingPresence) {
-    throw new BadRequestError('User has not checked in today');
+    throw new BadRequestError('Siswa belum melakukan presensi masuk hari ini');
   }
 
   // If already checked out today, return existing record
   if (existingPresence.checkOut) {
     return {
       data: { ...existingPresence, user },
-      message: 'User has already checked out today',
+      message: 'Siswa sudah melakukan presensi keluar hari ini',
     };
   }
 
@@ -266,7 +266,7 @@ async function handleCheckOut(
 
   return {
     data: { ...updatedPresence, user },
-    message: 'Check-out successful',
+    message: 'Presensi keluar berhasil',
     status: 200,
   };
 }
