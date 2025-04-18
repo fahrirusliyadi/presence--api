@@ -4,11 +4,45 @@ import path from 'path';
 import { db } from '../db';
 import { userTable } from '../db/schema';
 import { validate } from '../validation';
-import { createUserSchema } from './validations';
+import { createUserSchema, updateUserSchema } from './validations';
 import { count, eq } from 'drizzle-orm';
 import { deleteFace, updateFace } from './face-recognition';
 import { catchAsync, NotFoundError } from '../error';
 import { deleteFile } from '../static';
+import { z } from 'zod';
+
+// Define user types based on the validation schema
+type UserCreateInput = z.infer<typeof createUserSchema>;
+type UserUpdateInput = z.infer<typeof updateUserSchema>;
+type UserRecord = typeof userTable.$inferSelect;
+
+// Helper functions for user operations
+const handleUserPhoto = (
+  photoFile: Express.Multer.File | undefined,
+): string | null => {
+  return photoFile ? `user/${photoFile.filename}` : null;
+};
+
+const cleanupUploadedFile = (file: Express.Multer.File | undefined): void => {
+  if (file) {
+    deleteFile(file.path.replace('storage/', ''));
+  }
+};
+
+const processUserWithPhoto = async (
+  id: number,
+  photoFile: Express.Multer.File | undefined,
+  oldPhoto: string | null = null,
+): Promise<void> => {
+  if (photoFile) {
+    await updateFace(id, photoFile);
+
+    // Clean up old photo if it exists and is different
+    if (oldPhoto) {
+      deleteFile(oldPhoto);
+    }
+  }
+};
 
 const router = express.Router();
 // Configure storage with custom filename
@@ -61,6 +95,87 @@ router.get(
   }),
 );
 
+// GET user by ID
+router.get(
+  '/:id',
+  catchAsync(async (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    const [user] = await db
+      .select()
+      .from(userTable)
+      .where(eq(userTable.id, id));
+
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    res.json({ data: user });
+  }),
+);
+
+// Function to handle user creation or update
+const processUser = async (
+  userData: UserCreateInput | UserUpdateInput,
+  photoFile: Express.Multer.File | undefined,
+  existingUser?: UserRecord,
+): Promise<number> => {
+  const isUpdate = !!existingUser;
+  let userId = isUpdate ? existingUser.id : 0;
+
+  // For update operations, we can use partial types
+  if (isUpdate) {
+    // Prepare update data with only the fields we want to update
+    const updateData: Partial<typeof userTable.$inferInsert> = {};
+
+    if (userData.name) updateData.name = userData.name;
+    if (userData.email) updateData.email = userData.email;
+    if (photoFile) {
+      updateData.photo = handleUserPhoto(photoFile);
+    }
+
+    // No changes needed for update
+    if (Object.keys(updateData).length === 0) {
+      return userId;
+    }
+
+    // Database update operation with transaction
+    await db.transaction(async (tx) => {
+      // Update existing user
+      await tx
+        .update(userTable)
+        .set(updateData)
+        .where(eq(userTable.id, userId));
+
+      // Process photo and face recognition
+      await processUserWithPhoto(userId, photoFile, existingUser.photo);
+    });
+  } else {
+    // For insert operations, we need to ensure required fields are present
+    const insertData = {
+      name: (userData as UserCreateInput).name,
+      email: (userData as UserCreateInput).email,
+      photo: photoFile ? handleUserPhoto(photoFile) : null,
+    } as const; // Use as const to ensure type safety
+
+    // Database insert operation with transaction
+    await db.transaction(async (tx) => {
+      // Create new user
+      const [{ id }] = await tx
+        .insert(userTable)
+        .values(insertData)
+        .$returningId();
+      userId = id;
+
+      // Process photo and face recognition
+      if (photoFile) {
+        await processUserWithPhoto(userId, photoFile, null);
+      }
+    });
+  }
+
+  return userId;
+};
+
 // POST create new user
 router.post(
   '/',
@@ -68,32 +183,10 @@ router.post(
   validate(createUserSchema),
   catchAsync(async (req: Request, res: Response) => {
     try {
-      const userData = req.body;
-      const photoFile = req.file;
-      const user: typeof userTable.$inferInsert = {
-        name: userData.name,
-        email: userData.email,
-        photo: photoFile ? `user/${photoFile.filename}` : null,
-      };
-
-      // Use a transaction to ensure database consistency
-      await db.transaction(async (tx) => {
-        // Insert the user within the transaction
-        const [{ id }] = await tx.insert(userTable).values(user).$returningId();
-
-        // Register the face within the same transaction
-        if (photoFile) {
-          await updateFace(id, photoFile);
-        }
-      });
-
+      await processUser(req.body, req.file);
       res.status(204).end();
     } catch (error) {
-      // Delete the uploaded file if an error occurs
-      if (req.file) {
-        deleteFile(req.file.path.replace('storage/', ''));
-      }
-
+      cleanupUploadedFile(req.file);
       throw error;
     }
   }),
@@ -121,6 +214,34 @@ router.delete(
     }
 
     res.status(204).end();
+  }),
+);
+
+// PUT update user
+router.put(
+  '/:id',
+  upload.single('photo'),
+  validate(updateUserSchema),
+  catchAsync(async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id);
+
+      // Check if user exists
+      const [existingUser] = await db
+        .select()
+        .from(userTable)
+        .where(eq(userTable.id, id));
+
+      if (!existingUser) {
+        throw new NotFoundError('User not found');
+      }
+
+      await processUser(req.body, req.file, existingUser);
+      res.status(204).end();
+    } catch (error) {
+      cleanupUploadedFile(req.file);
+      throw error;
+    }
   }),
 );
 
