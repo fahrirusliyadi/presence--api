@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
 import { recognizeFace } from '../user';
-import { db } from '../db';
+import { db, paginate } from '../db';
 import { PresenceStatus, presenceTable, userTable } from '../db/schema';
 import { eq, and, count } from 'drizzle-orm';
 import { BadRequestError, catchAsync, NotFoundError } from '../error';
@@ -26,34 +26,23 @@ router.get(
   catchAsync(async (req: Request, res: Response) => {
     const currentDate = dayjs().startOf('day').format('YYYY-MM-DD');
 
-    // Get pagination parameters from query string
-    const page = parseInt((req.query.page as string) || '1');
-    const limit = parseInt((req.query.limit as string) || '10');
-    // Calculate offset
-    const offset = (page - 1) * limit;
+    // Build the base query with joins
+    const query = db
+      .select()
+      .from(presenceTable)
+      .leftJoin(userTable, eq(presenceTable.userId, userTable.id))
+      .where(eq(presenceTable.date, currentDate));
 
-    const presences = await db.query.presenceTable.findMany({
-      where: eq(presenceTable.date, currentDate),
-      with: {
-        user: true,
-      },
-      limit,
-      offset,
-    });
-
-    // Get total count for pagination metadata
-    const [{ total }] = await db
+    // Create a count query that matches the same filter
+    const countQuery = db
       .select({ total: count() })
       .from(presenceTable)
       .where(eq(presenceTable.date, currentDate));
 
-    const lastPage = Math.ceil(total / limit);
+    // Apply pagination
+    const result = await paginate(req, query, countQuery);
 
-    res.json({
-      data: presences,
-      page,
-      lastPage,
-    });
+    res.json(result);
   }),
 );
 

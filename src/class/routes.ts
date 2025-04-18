@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { db } from '../db';
+import { db, paginate } from '../db';
 import { classTable, userTable } from '../db/schema';
 import { validate } from '../validation';
 import { createClassSchema, updateClassSchema } from './validations';
@@ -17,23 +17,15 @@ const router = express.Router();
 router.get(
   '/',
   catchAsync(async (req: Request, res: Response) => {
-    // Get pagination parameters from query string
-    const page = parseInt((req.query.page as string) || '1');
-    const limit = parseInt((req.query.limit as string) || '10');
-    // Calculate offset
-    const offset = (page - 1) * limit;
+    // Build the base query
+    const query = db.select().from(classTable);
 
-    const classes = await db
-      .select()
-      .from(classTable)
-      .limit(limit)
-      .offset(offset);
+    // Create a count query for total records
+    const countQuery = db.select({ total: count() }).from(classTable);
 
-    // Get total count for pagination metadata
-    const [{ total }] = await db.select({ total: count() }).from(classTable);
-    const lastPage = Math.ceil(total / limit);
-
-    res.json({ data: classes, page, lastPage });
+    // Apply pagination
+    const result = await paginate(req, query, countQuery);
+    res.json(result);
   }),
 );
 

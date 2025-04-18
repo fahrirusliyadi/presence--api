@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
-import { db } from '../db';
+import { db, paginate } from '../db';
 import { userTable } from '../db/schema';
 import { validate } from '../validation';
 import { createUserSchema, updateUserSchema } from './validations';
@@ -80,18 +80,15 @@ const upload = multer({
 router.get(
   '/',
   catchAsync(async (req: Request, res: Response) => {
-    // Get pagination parameters from query string
-    const page = parseInt((req.query.page as string) || '1');
-    const limit = parseInt((req.query.limit as string) || '10');
-    // Calculate offset
-    const offset = (page - 1) * limit;
-    // This is where you would fetch users from your database
-    const users = await db.select().from(userTable).limit(limit).offset(offset);
-    // Get total count for pagination metadata
-    const [{ total }] = await db.select({ total: count() }).from(userTable);
-    const lastPage = Math.ceil(total / limit);
+    // Build the base query
+    const query = db.select().from(userTable);
 
-    res.json({ data: users, page, lastPage });
+    // Create a count query for total records
+    const countQuery = db.select({ total: count() }).from(userTable);
+
+    // Apply pagination
+    const result = await paginate(req, query, countQuery);
+    res.json(result);
   }),
 );
 
