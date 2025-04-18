@@ -3,7 +3,7 @@ import { db, paginate } from '../db';
 import { classTable, userTable } from '../db/schema';
 import { validate } from '../validation';
 import { createClassSchema, updateClassSchema } from './validations';
-import { count, eq } from 'drizzle-orm';
+import { count, eq, like } from 'drizzle-orm';
 import { catchAsync, NotFoundError, BadRequestError } from '../error';
 import { z } from 'zod';
 
@@ -18,13 +18,25 @@ router.get(
   '/',
   catchAsync(async (req: Request, res: Response) => {
     // Build the base query
-    const query = db.select().from(classTable);
+    const baseQuery = db.select().from(classTable);
 
     // Create a count query for total records
-    const countQuery = db.select({ total: count() }).from(classTable);
+    const baseCountQuery = db.select({ total: count() }).from(classTable);
 
-    // Apply pagination
-    const result = await paginate(req, query, countQuery);
+    // Apply search filter if search parameter exists
+    if (req.query.search && typeof req.query.search === 'string') {
+      const searchTerm = `%${req.query.search}%`;
+      // Apply pagination with search filter
+      const result = await paginate(
+        req,
+        baseQuery.where(like(classTable.name, searchTerm)),
+        baseCountQuery.where(like(classTable.name, searchTerm)),
+      );
+      return res.json(result);
+    }
+
+    // Apply pagination without search filter
+    const result = await paginate(req, baseQuery, baseCountQuery);
     res.json(result);
   }),
 );
