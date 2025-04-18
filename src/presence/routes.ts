@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
-import { recognizeFace } from '../user/face-recognition';
+import { recognizeFace } from '../user';
 import { db } from '../db';
 import { PresenceStatus, presenceTable, userTable } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
