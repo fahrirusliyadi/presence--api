@@ -17,11 +17,23 @@ export enum PresenceStatus {
   LATE = 'late',
 }
 
+export const classTable = mysqlTable('class', {
+  id: serial().primaryKey(),
+  name: varchar({ length: 255 }).notNull(),
+  createdAt: timestamp('created_at', { mode: 'string' }).defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'string' })
+    .defaultNow()
+    .onUpdateNow(),
+});
+
 export const userTable = mysqlTable('user', {
   id: serial().primaryKey(),
   name: varchar({ length: 255 }).notNull(),
   email: varchar({ length: 255 }).notNull().unique(),
   photo: varchar({ length: 255 }),
+  classId: bigint('class_id', { mode: 'number', unsigned: true }).references(
+    () => classTable.id,
+  ),
   createdAt: timestamp('created_at', { mode: 'string' }).defaultNow(),
   updatedAt: timestamp('updated_at', { mode: 'string' })
     .defaultNow()
@@ -51,8 +63,16 @@ export const presenceTable = mysqlTable(
 );
 
 // Define relationships between tables
-export const userRelations = relations(userTable, ({ many }) => ({
+export const classRelations = relations(classTable, ({ many }) => ({
+  students: many(userTable),
+}));
+
+export const userRelations = relations(userTable, ({ many, one }) => ({
   presences: many(presenceTable),
+  class: one(classTable, {
+    fields: [userTable.classId],
+    references: [classTable.id],
+  }),
 }));
 
 export const presenceRelations = relations(presenceTable, ({ one }) => ({
